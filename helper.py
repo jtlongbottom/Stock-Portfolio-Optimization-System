@@ -25,13 +25,17 @@ def get_stock_names (tickers):
     names = []
     
     for ticker in tickers:
-        info = yf.Ticker(ticker).info
-        if 'shortName' in list(info.keys()):
-            name = info['shortName']
-        #asset_type = info['typeDisp']
-            
-        elif 'longName' in list(info.keys()):
-            name = info['longName']
-        names.append(name)
+        try:
+            info = yf.Ticker(ticker).info
+            if 'shortName' in list(info.keys()):
+                name = info['shortName']
+            #asset_type = info['typeDisp']
+                
+            elif 'longName' in list(info.keys()):
+                name = info['longName']
+            names.append(name)
+        except Exception as e:
+            print(f"Error fetching info for {ticker}: {e}")
+            continue
     return names
         
