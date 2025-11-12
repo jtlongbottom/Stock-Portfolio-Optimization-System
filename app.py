@@ -2,8 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from helper import get_stock_names
+import polars as pl
+import numpy as np
+import matplotlib.pyplot as plt
+#from Gather_Data import main_df
 cached_stock_names = st.cache_data(get_stock_names, ttl = 3600)
 
+#def get_data():
+#    return Gather_Data.
 
 st.set_page_config(page_title="Stock Portfolio Optimization")
 
@@ -18,7 +24,7 @@ st.title("Stock Portfolio Optimization")
 ### Tolerance ###
 
 tolerance = st.sidebar.selectbox("Tolerance:",["Conservative","Moderate","Aggressive"])
-st.sidebar.markdown('<p style="font-size:13px; color:white;">What is my tolerance? Check out Risk Tolerance Questionaire Page</p>', unsafe_allow_html=True)
+st.sidebar.markdown('<p style="font-size:13px; color:white;">What is my tolerance? Check out Risk Tolerance Questionaire Page Above</p>', unsafe_allow_html=True)
 
 
 default_percentages = {
@@ -102,8 +108,61 @@ if False:
     st.session_state.range = [min_input, max_input]
 
 
+### Placeholder Chart ###
+
+def create_df():
+    dates = pd.date_range(start="2023-01-01",end="2025-10-28", freq="D")
+    n=len(dates)
+    price = [100]
+    for _ in range(1, n):
+        change = 1 + 0.001 + 0.02 * np.random.randn()
+        price.append(price[-1] * change)
+    #trend = np.cumsum(np.random.rand(n)*0.5+0.1**n)
+    df = pl.DataFrame({"Date":pl.Series("Date", dates),
+                       "Price": pl.Series("Price",price, dtype=pl.Float64)})
+    return df
 
 
+
+def create_graph(df):
+    #theme = st.get_option("theme.base")
+    query_params = st.query_params
+    theme = query_params.get("theme",["dark"])[0]
+    #print(theme)
+    #default is always dark could add button to switch between dark and light
+    if theme == "dark":
+        bg_color = "#0E1117"
+        grid_color = "#555555"
+        text_color = "white"
+        line_color = "cyan"
+    else:
+        bg_color = "white"
+        grid_color = "#cccccc"
+        text_color = "black"
+        line_color = "teal"
+
+    fig, ax = plt.subplots(figsize=(10,5), facecolor = bg_color)
+    ax.plot(df["Date"], df["Price"], color = line_color, linewidth=2)
+    ax.set_title("Title", color = text_color)
+    ax.set_xlabel("Dates", color = text_color)
+    ax.set_ylabel("Price", color = text_color)
+    ax.tick_params(axis="x", color = text_color)
+    ax.tick_params(axis="y", color = text_color)
+
+    for label in ax.get_xticklabels():
+        label.set_color(text_color)
+    for label in ax.get_yticklabels():
+        label.set_color(text_color)
+
+    ax.set_facecolor(bg_color)
+    ax.grid(True, alpha=0.3, color = grid_color)
+    return fig
+
+df1 = create_df()
+df2 = create_df()
+
+spos = create_graph(df1)
+sp500 = create_graph(df2)
 
 
 ### Pie Chart ###
@@ -122,22 +181,48 @@ invest_pie = pd.DataFrame({'Investment':["Bonds","Stock","Cash Equivalents"],
 
 invest_pie = (invest_pie.set_index('Investment').reindex(invest_order, fill_value=0).reset_index())
 
-fig = px.pie(invest_pie, names ='Investment',values='Amount', 
+pie = px.pie(invest_pie, names ='Investment',values='Amount', 
              color = 'Investment',
              category_orders={'Investment':invest_order}, 
              color_discrete_map=color_map,  
              template="plotly_white",
              title = 'Percentages')
-fig.update_layout(width=400, height=400, 
+pie.update_layout(width=400, height=400, 
                   legend=dict(orientation="h"),
                   margin=dict(t=100,b=10,l=10,r=10))
 
+
+### metrics ###
+
+exp_return = 0.12
+std_dev = 0.04
+bond = 0.03
+sharpe_ratio = (exp_return - bond)/std_dev
+
+
+
+
+
+### Main plot###
 col1, col2 = st.columns([2,1])
 with col1:
     st.write("Main stuff")
+    show_fan = st.checkbox("Display Fan Chart", value = False)
+    tab= st.radio("", ["SPOS","S&P 500"], key="chart_tab")
+    if tab == "SPOS":
+        st.pyplot(spos)
+    if tab == "S&P 500":
+        st.pyplot(sp500)
 with col2:
-    st.plotly_chart(fig, use_container_width=False, theme=None)
-
+    st.plotly_chart(pie, use_container_width=False, theme=None)
+    if tab == "SPOS":
+        st.metric("Expected Return", f"{ exp_return *100:.2f}%")
+        st.metric("Volatility", f"{ std_dev *100:.2f}%")
+        st.metric("Sharpe Ratio", f"{ sharpe_ratio:.2f}")
+    elif tab == "S&P 500": 
+        st.metric("Expected Return", f"{ exp_return *100+10:.2f}%", delta = f"{10}%")
+        st.metric("Volatility", f"{ std_dev *100-1:.2f}%", delta = f"{-1}%")
+        st.metric("Sharpe Ratio", f"{ sharpe_ratio+0.1:.2f}", delta = 0.1)
 
 
 #### Stock Selection #######
